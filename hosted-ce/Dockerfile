@@ -1,8 +1,9 @@
 FROM hub.opensciencegrid.org/opensciencegrid/hosted-ce:23-testing
+ARG branch=devel
 
 RUN \
  cd /usr/local/src && \
- git clone https://github.com/matyasselmeci/hermitcrab
+ git clone -b "${branch}" https://github.com/matyasselmeci/hermitcrab
 
 COPY image-init.d/* /etc/osg/image-init.d/
 
