@@ -1,4 +1,5 @@
 FROM hub.opensciencegrid.org/opensciencegrid/hosted-ce:23-testing
+ARG branch=devel
 
 # DEBUG: install some decent editors
 RUN --mount=type=cache,target=/var/cache/yum,sharing=locked \
