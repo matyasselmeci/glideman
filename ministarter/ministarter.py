@@ -22,7 +22,7 @@ from typing import Dict, List, NamedTuple
 
 from procstat import ProcFamily
 
-VERSION = "0.1"
+VERSION = "0.8"
 # ^^ something to print at the beginning to see what version of
 #    this program is running; try to base it on "git describe"
 
@@ -115,7 +115,7 @@ class Advertiser:
     # Public methods
     #
 
-    def setup_condor(self, scratch_dir: Path, idtoken_file: str):
+    def setup_condor(self, scratch_dir: Path, idtoken_file: str, idtoken_tarball: str):
         """
         Extract the condor tarball into a directory; place the token, and set up
         the environment for using the binaries from the tarball.
@@ -129,6 +129,8 @@ class Advertiser:
         Args:
             scratch_dir: The scratch directory (job sandbox)
             idtoken_file: The path to the idtoken file for contacting the CE's collector
+            idtoken_tarball: If the idtoken file is in a tarball that needs to be
+                 extracted first, this is the path to the tarball.
 
         Raises:
             AdvertiseSetupError: If a required file is missing or setup fails.
@@ -142,12 +144,22 @@ class Advertiser:
             raise AdvertiseSetupError("idtoken file not provided")
 
         # File existence checks
-        if not idtoken_file_p.is_file():
-            raise AdvertiseSetupError(
-                "idtoken file not found at %s or is not a file" % idtoken_file
-            )
+        idtoken_tarball_p = None
+        if idtoken_tarball:
+            idtoken_tarball_p = Path(idtoken_tarball)
+            if not idtoken_tarball_p.is_file():
+                raise AdvertiseSetupError(
+                    "idtoken tarball file not found at %s or is not a file"
+                    % idtoken_tarball
+                )
+        else:
+            # The token is not in a tarball; check that it exists
+            if not idtoken_file_p.is_file():
+                raise AdvertiseSetupError(
+                    "idtoken file not found at %s or is not a file" % idtoken_file
+                )
 
-        # Create a dir to hold the tarball contents
+        # Create a dir to hold the condor tarball contents
         self.condor_dir = Path(
             tempfile.mkdtemp(suffix="_condor", prefix="ministarter_", dir=scratch_dir)
         )
@@ -155,7 +167,10 @@ class Advertiser:
         token_dir = self.condor_dir / "token"
 
         self._untar_condor(self.condor_dir)
-        self._setup_token(token_dir, idtoken_file_p)
+        if idtoken_tarball_p:
+            self._setup_token_from_tarball(token_dir, idtoken_file_p, idtoken_tarball_p)
+        else:
+            self._setup_token(token_dir, idtoken_file_p)
         self.condor_env = self._get_environment(self.condor_dir, token_dir)
         self._verify_condor(self.condor_dir, self.condor_env)
 
@@ -256,6 +271,31 @@ class Advertiser:
             # we didn't pipe stdout/stderr so it will already show up in the log
             raise AdvertiseSetupError(
                 "condor tarball extraction failed with code %s" % err.returncode
+            )
+
+    def _setup_token_from_tarball(
+        self, token_dir: Path, idtoken_file: Path, token_tarball: Path
+    ) -> None:
+        try:
+            dest_token_file = token_dir / "collector_token"
+            os.makedirs(token_dir, exist_ok=True)
+            os.chmod(token_dir, 0o700)
+            with open(dest_token_file, "wb") as dest_token_fh:
+                subprocess.run(
+                    [
+                        "tar",
+                        "--to-stdout",
+                        "-xf",
+                        str(token_tarball),
+                        f"tokens/{idtoken_file.name}",
+                    ],
+                    check=True,
+                    stdout=dest_token_fh,
+                )
+            os.chmod(dest_token_file, 0o600)
+        except (subprocess.CalledProcessError, OSError) as err:
+            raise AdvertiseSetupError(
+                "setting up token from tarball failed with exception %s" % err
             )
 
     def _setup_token(self, token_dir: Path, idtoken_file: Path) -> None:
@@ -448,6 +488,13 @@ def parse_args(argv):
         help="File name of idtoken to authenticate to the collector with",
     )
     parser.add_argument(
+        "--idtoken-tarball",
+        default="",
+        help="Path to a tarball containing the token to use for advertising if the "
+        "token is not extracted in the sandbox. "
+        "--idtoken-file will be looked for in the tarball contents.",
+    )
+    parser.add_argument(
         "--must-advertise",
         action="store_true",
         help="Exit if we are unable to set up advertising",
@@ -495,6 +542,7 @@ def main(argv=None) -> int:
     exec_args: List[str] = args.exec_args
     collector_host: str = args.collector_host
     idtoken_file: str = args.idtoken_file
+    idtoken_tarball: str = args.idtoken_tarball
     must_advertise: bool = args.must_advertise
     watch_command: List[str] = args.watch_command
     job_id: str = args.job_id
@@ -537,7 +585,7 @@ def main(argv=None) -> int:
         )
     advertiser = Advertiser(collector_host)
     try:
-        advertiser.setup_condor(scratch_dir, idtoken_file)
+        advertiser.setup_condor(scratch_dir, idtoken_file, idtoken_tarball)
     except AdvertiseSetupError as err:
         if must_advertise:
             raise
