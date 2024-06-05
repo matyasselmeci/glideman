@@ -1,0 +1,11 @@
+--- a/etc/condor-ce/condor_config	2024-06-04 20:16:37.594486300 -0500
++++ b/etc/condor-ce/condor_config	2024-06-04 20:18:06.497490400 -0500
+@@ -42,7 +42,7 @@
+ MASTER_ADDRESS_FILE = $(LOG)/.master_address
+ SCHEDD_ADDRESS_FILE = $(SPOOL)/.schedd_address
+
+-LOCAL_CONFIG_DIR = /usr/share/condor-ce/config.d,/etc/condor-ce/config.d
++LOCAL_CONFIG_DIR = /usr/share/condor-ce/config.d,/etc/condor-ce/config.d,/etc/condor-ce/local-config.d
+ LOCAL_CONFIG_DIR_EXCLUDE_REGEXP = ^((\..*)|(.*~)|(#.*)|(.*\.rpmsave)|(.*\.rpmnew))$
+
+ CONDOR_ADMIN = root@$(FULL_HOSTNAME)
