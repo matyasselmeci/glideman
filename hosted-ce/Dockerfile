@@ -1,4 +1,9 @@
 FROM hub.opensciencegrid.org/opensciencegrid/hosted-ce:23-testing
+
+# DEBUG: install some decent editors
+RUN --mount=type=cache,target=/var/cache/yum,sharing=locked \
+ yum install -y vim-enhanced nano
+
 ARG branch=devel
 
 RUN \
