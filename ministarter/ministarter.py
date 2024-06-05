@@ -54,6 +54,23 @@ def _cleanup_dir(dir_path: Path) -> None:
         _log.warning("Error cleaning up %s: %s", dir_path, err, exc_info=True)
 
 
+def _log_ml(lvl: int, msg: str, *args, **kwargs):
+    """
+    Log a potentially multi-line message by splitting the lines and doing
+    individual calls to _log.log().  exc_info and stack_info will only be
+    printed for the last line.
+    """
+    if lvl >= _log.getEffectiveLevel():
+        orig_kwargs = kwargs.copy()
+        msg_lines = (msg % args).splitlines()
+        last_line = msg_lines[-1]
+        kwargs.pop("exc_info", None)
+        kwargs.pop("stack_info", None)
+        for line in msg_lines[:-1]:
+            _log.log(lvl, "%s", line, **kwargs)
+        return _log.log(lvl, "%s", last_line, **orig_kwargs)
+
+
 class AdvertiseSetupError(Exception):
     """Exception raised when setting up advertising fails."""
 
@@ -204,16 +221,16 @@ class Advertiser:
                 )
                 if ret.returncode == 0:
                     _log.debug("condor_advertise successful")
-                    _log.debug("Output: %s", ret.stdout)
+                    _log_ml(logging.DEBUG, "Output: %s", ret.stdout)
                     self.success_count += 1
                     return True
                 else:
                     _log.warning(
                         "condor_advertise unsuccessful, exit code %d", ret.returncode
                     )
-                    _log.warning("Output: %s", ret.stdout)
+                    _log_ml(logging.WARNING, "Output: %s", ret.stdout)
                     with open(adfh.name, encoding="utf-8") as adfh_read:
-                        _log.debug("ad:\n%s", adfh_read.read())
+                        _log_ml(logging.DEBUG, "ad:\n%s", adfh_read.read())
                     self.failure_count += 1
                     return False
         except Exception as err:
@@ -297,12 +314,12 @@ class Advertiser:
             env=condor_env,
         )
         if result.returncode == 0:
-            _log.info(
-                "condor_version succeeded. Output:\n%s",
-                result.stdout,
+            _log_ml(
+                logging.INFO, "condor_version succeeded. Output:\n%s", result.stdout
             )
         else:
-            _log.warning(
+            _log_ml(
+                logging.WARNING,
                 "condor_version failed with return code %d. Output:\n%s",
                 result.returncode,
                 result.stdout,
@@ -509,8 +526,11 @@ def main(argv=None) -> int:
         with zipfile.ZipFile(sys.path[0], "r") as _:
             pass
     except (OSError, zipfile.BadZipFile) as err:
-        _log.error(
-            f"{sys.path[0]} is not a .pyz or .zip file or can't be opened: {err}"
+        _log_ml(
+            logging.ERROR,
+            "%s is not a .pyz or .zip file or can't be opened: %s",
+            sys.path[0],
+            err,
         )
         return ERR_NOT_ZIP
 
@@ -521,7 +541,8 @@ def main(argv=None) -> int:
         _log.debug("We are not in a condor job")
         scratch_dir = Path.cwd()
     if _debug:
-        _log.debug(
+        _log_ml(
+            logging.DEBUG,
             "Directory listing:\n%s",
             subprocess.run(
                 shlex.split(
