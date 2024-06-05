@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-from argparse import ArgumentParser, FileType, Namespace
-from configparser import ConfigParser
 import glob
 import os
-from pathlib import Path
 import shlex
 import shutil
 import subprocess as sp
 import sys
 import tempfile
 import zipapp
+from argparse import ArgumentParser, FileType, Namespace
+from configparser import ConfigParser
+from pathlib import Path
 from typing import Dict, List, Optional
-
 
 DOWNLOAD_URL_TEMPLATE = "https://research.cs.wisc.edu/htcondor/tarball/{series}/current/condor-{arch}_{os}-stripped.tar.gz"
 
