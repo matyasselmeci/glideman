@@ -4,6 +4,8 @@ FROM hub.opensciencegrid.org/opensciencegrid/hosted-ce:23-testing
 RUN --mount=type=cache,target=/var/cache/yum,sharing=locked \
  yum install -y vim-enhanced nano
 
+RUN git config --global user.name 'root'; git config --global user.email 'root@container'
+
 ARG branch=devel
 
 RUN \
