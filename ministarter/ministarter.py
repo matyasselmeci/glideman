@@ -22,7 +22,7 @@ from typing import Dict, List, NamedTuple
 
 from procstat import ProcFamily
 
-VERSION = "0.1"
+VERSION = "0.14"
 # ^^ something to print at the beginning to see what version of
 #    this program is running; try to base it on "git describe"
 
@@ -301,7 +301,9 @@ class Advertiser:
         condor_env["_CONDOR_SEC_CLIENT_AUTHENTICATION_METHODS"] = "IDTOKENS"
         condor_env["_CONDOR_SEC_CLIENT_AUTHENTICATION"] = "REQUIRED"
         if _debug:
-            condor_env["_CONDOR_TOOL_DEBUG"] = "D_FULLDEBUG,D_CAT,D_SECURITY:2"
+            condor_env["_CONDOR_TOOL_DEBUG"] = (
+                "D_FULLDEBUG,D_CAT,D_SECURITY:2,D_NETWORK:2"
+            )
         return condor_env
 
     def _verify_condor(self, condor_dir: Path, condor_env: Dict[str, str]) -> None:
