@@ -22,7 +22,7 @@ from typing import Dict, List, NamedTuple
 
 from procstat import ProcFamily
 
-VERSION = "0.14"
+VERSION = "0.16"
 # ^^ something to print at the beginning to see what version of
 #    this program is running; try to base it on "git describe"
 
@@ -174,6 +174,7 @@ class Advertiser:
         self._untar_condor(self.condor_dir)
         self._setup_token(token_dir, idtoken_file_p)
         self.condor_env = self._get_environment(self.condor_dir, token_dir)
+        _log_ml(logging.DEBUG, "condor environment: %r", self.condor_env)
         self._verify_condor(self.condor_dir, self.condor_env)
 
         self.initialized = True
