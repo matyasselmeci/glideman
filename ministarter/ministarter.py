@@ -22,7 +22,7 @@ from typing import Dict, List, NamedTuple
 
 from procstat import ProcFamily
 
-VERSION = "0.17"
+VERSION = "0.16"
 # ^^ something to print at the beginning to see what version of
 #    this program is running; try to base it on "git describe"
 
@@ -177,8 +177,6 @@ class Advertiser:
         _log_ml(logging.DEBUG, "condor environment: %r", self.condor_env)
         self._verify_condor(self.condor_dir, self.condor_env)
 
-        if _debug:
-            _debug_dir_listing(scratch_dir)
         self.initialized = True
 
     def advertise(self, contents: Dict[str, str], debug=False) -> bool:
@@ -505,24 +503,6 @@ def setup_logging():
     )
 
 
-def _debug_dir_listing(dirname):
-    _log_ml(
-        logging.DEBUG,
-        "Directory listing:\n%s",
-        subprocess.run(
-            shlex.split(
-                f"find '{dirname}' -xdev "
-                "-name lost+found -prune -o "
-                "-name .git -prune -o "
-                "-name .*cache -prune -o "
-                "-ls",
-            ),
-            stdout=subprocess.PIPE,
-            encoding="latin-1",
-        ).stdout,
-    )
-
-
 def main(argv=None) -> int:
     """Main function"""
     global _debug
@@ -564,7 +544,21 @@ def main(argv=None) -> int:
         _log.debug("We are not in a condor job")
         scratch_dir = Path.cwd()
     if _debug:
-        _debug_dir_listing(scratch_dir)
+        _log_ml(
+            logging.DEBUG,
+            "Directory listing:\n%s",
+            subprocess.run(
+                shlex.split(
+                    f"find '{scratch_dir}' -xdev "
+                    "-name lost+found -prune -o "
+                    "-name .git -prune -o "
+                    "-name .*cache -prune -o "
+                    "-ls",
+                ),
+                stdout=subprocess.PIPE,
+                encoding="latin-1",
+            ).stdout,
+        )
     advertiser = Advertiser(collector_host)
     try:
         advertiser.setup_condor(scratch_dir, idtoken_file)
