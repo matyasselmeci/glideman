@@ -29,6 +29,7 @@ if __name__ == "__main__" and __package__ is None:
 
 DEFAULT_DB = "msrecorder.db"
 DEFAULT_INTERVAL = 20
+DEFAULT_ERROR_BACKOFF = 60
 
 _log = logging.getLogger(__name__)
 
@@ -88,23 +89,25 @@ def get_args(argv):
     """Parse and validate arguments"""
     parser = ArgumentParser()
     parser.add_argument(
-        "--db", default=DEFAULT_DB, help="SQLite database file for recording events"
+        "--db",
+        default=DEFAULT_DB,
+        help="SQLite database file for recording events [%(default)s]",
     )
     parser.add_argument(
         "--interval",
         default=DEFAULT_INTERVAL,
         type=int,
-        help="Interval between checks (daemon mode only)",
+        help="Interval between checks (daemon mode only) [%(default)s]",
     )
     parser.add_argument(
-        "--loop",
+        "--daemon",
         action="store_true",
-        help="Run in a loop, checking every --interval seconds",
+        help="Run in a loop, checking every --interval seconds [%(default)s]",
     )
     parser.add_argument(
         "--debug",
         action="store_true",
-        help="Enable debug logging",
+        help="Enable debug logging [%(default)s]",
     )
     args = parser.parse_args(argv[1:])
     return args
@@ -149,13 +152,34 @@ def main(argv=None):
         format="%(message)s",
         level=logging.DEBUG if args.debug else logging.INFO,
     )
+    error_backoff = DEFAULT_ERROR_BACKOFF
 
     con = sqlite3.connect(args.db)
     create_table(con)
     while True:
-        count = record_status(con)
-        _log.debug("recorded %d ads", count)
-        if not args.loop:
+        try:
+            count = record_status(con)
+            _log.debug("recorded %d ads", count)
+        except (
+            OSError,
+            KeyError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            sqlite3.Error,
+        ) as err:
+            if args.daemon:
+                _log.warning(
+                    "%s(%s); backing off for %d s",
+                    type(err),
+                    err,
+                    error_backoff,
+                    exc_info=args.debug,
+                )
+                time.sleep(error_backoff)
+            else:
+                raise
+        if not args.daemon:
             break
         time.sleep(args.interval)
 
