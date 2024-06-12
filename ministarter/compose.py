@@ -27,9 +27,9 @@ DEFAULTS = {
     "pilotfile": "pilot.pyz",
 }
 
-for k, v in DEFAULTS.items():
-    if k in CHOICES:
-        assert v in CHOICES[k]
+for _k, _v in DEFAULTS.items():
+    if _k in CHOICES:
+        assert _v in CHOICES[_k]
 
 
 def get_tempdir() -> str:
