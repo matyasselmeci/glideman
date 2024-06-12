@@ -13,6 +13,7 @@ RUN \
  git clone -b "${branch}" https://github.com/matyasselmeci/hermitcrab
 
 COPY image-init.d/* /etc/osg/image-init.d/
+COPY supervisord.d/* /etc/supervisord.d/
 COPY add-local-config-d.patch /tmp/add-local-config-d.patch
 RUN patch -p1 -i /tmp/add-local-config-d.patch && rm /tmp/add-local-config-d.patch
 
