@@ -28,6 +28,7 @@ if __name__ == "__main__" and __package__ is None:
 
 
 DEFAULT_DB = "msrecorder.db"
+DEFAULT_DELAY_START = 15
 DEFAULT_INTERVAL = 20
 DEFAULT_ERROR_BACKOFF = 60
 
@@ -77,10 +78,12 @@ def get_condor_status() -> List[Dict]:
         subprocess.TimeoutExpired,
         json.JSONDecodeError,
     ) as err:
-        _log.warning(f"error getting condor_ce_status: {err}")
+        _log.warning("error getting condor_ce_status: %s", err)
         return []
     if not isinstance(result_json, list):
-        _log.warning(f"unexpected result from condor_ce_status: {result_str[0:100]}...")
+        _log.warning(
+            "unexpected result from condor_ce_status: %s...", result_str[0:100]
+        )
         return []
     return result_json
 
@@ -97,7 +100,7 @@ def get_args(argv):
         "--interval",
         default=DEFAULT_INTERVAL,
         type=int,
-        help="Interval between checks (daemon mode only) [%(default)s]",
+        help="Interval between checks in seconds (daemon mode only) [%(default)s]",
     )
     parser.add_argument(
         "--daemon",
@@ -108,6 +111,14 @@ def get_args(argv):
         "--debug",
         action="store_true",
         help="Enable debug logging [%(default)s]",
+    )
+    parser.add_argument(
+        "--delay-start",
+        default=DEFAULT_DELAY_START,
+        type=int,
+        help="Wait for this many seconds before starting to query the collector; "
+        "used for waiting for the collector to start up. (Daemon mode only.) "
+        "[%(default)s]",
     )
     args = parser.parse_args(argv[1:])
     return args
