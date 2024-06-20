@@ -18,11 +18,11 @@ import tempfile
 import time
 import zipfile
 from pathlib import Path
-from typing import Dict, List, NamedTuple
+from typing import Dict, List, NamedTuple, Optional, Union
 
 from procstat import ProcFamily
 
-VERSION = "0.16"
+VERSION = "0.25-dockerpilot"
 # ^^ something to print at the beginning to see what version of
 #    this program is running; try to base it on "git describe"
 
@@ -109,12 +109,16 @@ class CompletedCommand(NamedTuple):
 class Advertiser:
     """A class for advertising ads to the CE's collector"""
 
-    def __init__(self, collector_host: str):
+    def __init__(self, collector_host: str, ad_file: Union[None, Path, str] = None):
         self.condor_dir = Path()
         self.collector_host = collector_host
         self.condor_env: Dict[str, str] = {}
         self.failure_count = 0
         self.success_count = 0
+        if ad_file:
+            self.ad_file = Path(ad_file)
+        else:
+            self.ad_file = None
         self.initialized = False
         # TODO name should be passed in
         self.name = f"MS-{socket.getfqdn()}-{secrets.token_hex(4)}"
@@ -151,6 +155,15 @@ class Advertiser:
             AdvertiseSetupError: If a required file is missing or setup fails.
         """
         self.initialized = False
+        if isinstance(self.ad_file, Path):
+            try:
+                self.ad_file.parent.mkdir(parents=True, exist_ok=True)
+            except OSError as err:
+                raise AdvertiseSetupError(
+                    f"Unable to set up ad file at {self.ad_file!s}: {err}"
+                )
+            self.initialized = True
+            return
 
         # Required information checks
         if idtoken_file:
@@ -201,6 +214,17 @@ class Advertiser:
         # ^^ advertise success; if it's not successful, the collector won't get the update anyway
 
         try:
+            # We have an ad file -- instead of calling condor_advertise, write to
+            # the file and return.
+            if isinstance(self.ad_file, Path):
+                with self.ad_file.open(mode="a+t", encoding="utf-8") as adfh:
+                    for key, value in ad.items():
+                        print(f"{key} = {value}", file=adfh)
+                    print("", file=adfh)
+                    adfh.flush()
+                return True
+
+            # We do not have an ad file.  Use condor_advertise.
             with tempfile.NamedTemporaryFile(
                 mode="w+t", encoding="utf-8", suffix=".ad"
             ) as adfh:
@@ -485,6 +509,13 @@ def parse_args(argv):
         help="Pilot job ID to put in the ministarter ad to identify the pilot",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug messages")
+    parser.add_argument(
+        "--ads-to-file",
+        metavar="FILE",
+        default=None,
+        help="Write ads to the given file instead of advertising. "
+        "In this case, neither an idtoken-file, nor a collector-host are necessary.",
+    )
     parser.add_argument("executable", help="Executable to start and monitor")
     parser.add_argument(
         "exec_args", nargs=argparse.REMAINDER, help="Arguments to executable"
@@ -518,6 +549,7 @@ def main(argv=None) -> int:
     must_advertise: bool = args.must_advertise
     watch_command: List[str] = args.watch_command
     job_id: str = args.job_id
+    ad_file: Optional[str] = args.ads_to_file
 
     if not os.path.exists(executable):
         _log.error("Executable %s not found", executable)
@@ -559,7 +591,7 @@ def main(argv=None) -> int:
                 encoding="latin-1",
             ).stdout,
         )
-    advertiser = Advertiser(collector_host)
+    advertiser = Advertiser(collector_host, ad_file)
     try:
         advertiser.setup_condor(scratch_dir, idtoken_file)
     except AdvertiseSetupError as err:
