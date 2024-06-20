@@ -25,6 +25,7 @@ DEFAULTS = {
     "arch": "x86_64",
     "python": "/usr/bin/python3",
     "pilotfile": "pilot.pyz",
+    "condor": True,
 }
 
 for _k, _v in DEFAULTS.items():
@@ -79,6 +80,12 @@ def get_args(argv: List[str]) -> Namespace:
     parser.add_argument(
         "--pilotfile",
         help=f"Name of pilot zip file to write [{DEFAULTS['pilotfile']}]",
+    )
+    parser.add_argument(
+        "--no-condor",
+        dest="condor",
+        action="store_false",
+        help="Do not bundle condor",
     )
 
     args = parser.parse_args(argv[1:])
@@ -143,7 +150,9 @@ def package_pilot(pilot_zip: str, python: str) -> None:
     os.chmod(pilot_zip, 0o755)
 
 
-def do_compose(pilot_zip: str, download_url: str, arch: str, python: str) -> None:
+def do_compose(
+    pilot_zip: str, download_url: Optional[str], arch: str, python: str
+) -> None:
     """
     Compose a pilot zip file.  Make a temp directory; copy the hermitcrab
     scripts, download and extract the condor tarball, and create the self-
@@ -151,7 +160,8 @@ def do_compose(pilot_zip: str, download_url: str, arch: str, python: str) -> Non
 
     Args:
         pilot_zip: the path to the pilot zip file to create
-        download_url: the download URL of the condor tarball
+        download_url: the download URL of the condor tarball.
+            If None, condor will not be bundled.
         arch: the CPU architecture of the condor tarball (used to exclude
               some directories
         python: the interpreter to use in the shebang line
@@ -169,8 +179,9 @@ def do_compose(pilot_zip: str, download_url: str, arch: str, python: str) -> Non
                 from ministarter import VERSION as MINISTARTER_VERSION
             except ImportError:
                 MINISTARTER_VERSION = "unknown"
-            condor_tarball = "condor.tar.gz"
-            repackage_condor(condor_tarball, download_url, arch)
+            if download_url is not None:
+                condor_tarball = "condor.tar.gz"
+                repackage_condor(condor_tarball, download_url, arch)
             package_pilot(pilot_zip, python)
             pilot_zip_size = os.path.getsize(pilot_zip)
             print(
@@ -188,7 +199,10 @@ def main(argv: Optional[str] = None) -> int:
     python = options["python"]
     arch = options["arch"]
 
-    download_url = DOWNLOAD_URL_TEMPLATE.format(**options)
+    if options["condor"]:
+        download_url = DOWNLOAD_URL_TEMPLATE.format(**options)
+    else:
+        download_url = None
 
     do_compose(pilot_zip, download_url, arch, python)
 
