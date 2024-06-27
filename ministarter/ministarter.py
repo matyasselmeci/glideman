@@ -258,14 +258,20 @@ class Advertiser:
             if debug:
                 args += ["-debug"]
             args += ["UPDATE_MASTER_AD", adfh.name]
-            ret = subprocess.run(
-                args,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=self.condor_env,
-                encoding="latin-1",
-                timeout=ADVERTISE_TIMEOUT,
-            )
+            try:
+                ret = subprocess.run(
+                    args,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    env=self.condor_env,
+                    encoding="latin-1",
+                    timeout=ADVERTISE_TIMEOUT,
+                )
+            except subprocess.TimeoutExpired:
+                _log.warning("condor_advertise timed out")
+                self.failure_count += 1
+                return False
+
             if ret.returncode == 0:
                 _log.debug("condor_advertise successful")
                 _log_ml(logging.DEBUG, "Output: %s", ret.stdout)
