@@ -225,39 +225,7 @@ class Advertiser:
                 return True
 
             # We do not have an ad file.  Use condor_advertise.
-            with tempfile.NamedTemporaryFile(
-                mode="w+t", encoding="utf-8", suffix=".ad"
-            ) as adfh:
-                for key, value in ad.items():
-                    print(f"{key} = {value}", file=adfh)
-                adfh.flush()
-                args = [str(self.condor_dir / "sbin/condor_advertise")]
-                args += ["-pool", self.collector_host]
-                if debug:
-                    args += ["-debug"]
-                args += ["UPDATE_MASTER_AD", adfh.name]
-                ret = subprocess.run(
-                    args,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    env=self.condor_env,
-                    encoding="latin-1",
-                    timeout=ADVERTISE_TIMEOUT,
-                )
-                if ret.returncode == 0:
-                    _log.debug("condor_advertise successful")
-                    _log_ml(logging.DEBUG, "Output: %s", ret.stdout)
-                    self.success_count += 1
-                    return True
-                else:
-                    _log.warning(
-                        "condor_advertise unsuccessful, exit code %d", ret.returncode
-                    )
-                    _log_ml(logging.WARNING, "Output: %s", ret.stdout)
-                    with open(adfh.name, encoding="utf-8") as adfh_read:
-                        _log_ml(logging.DEBUG, "ad:\n%s", adfh_read.read())
-                    self.failure_count += 1
-                    return False
+            return self._condor_advertise(ad, debug)
         except Exception as err:
             msg = "Exception raised while advertising: %s"
             if _debug:
@@ -270,6 +238,48 @@ class Advertiser:
     #
     # Private methods
     #
+
+    def _condor_advertise(self, ad: Dict, debug: bool) -> bool:
+        """
+        Use condor_advertise to send an ad.  This involves writing the ad to
+        a temporary file first.
+
+        Returns True on success, False on failure. May increment
+        self.success_count or self.failure_count.  Does not catch exceptions.
+        """
+        with tempfile.NamedTemporaryFile(
+            mode="w+t", encoding="utf-8", suffix=".ad"
+        ) as adfh:
+            for key, value in ad.items():
+                print(f"{key} = {value}", file=adfh)
+            adfh.flush()
+            args = [str(self.condor_dir / "sbin/condor_advertise")]
+            args += ["-pool", self.collector_host]
+            if debug:
+                args += ["-debug"]
+            args += ["UPDATE_MASTER_AD", adfh.name]
+            ret = subprocess.run(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=self.condor_env,
+                encoding="latin-1",
+                timeout=ADVERTISE_TIMEOUT,
+            )
+            if ret.returncode == 0:
+                _log.debug("condor_advertise successful")
+                _log_ml(logging.DEBUG, "Output: %s", ret.stdout)
+                self.success_count += 1
+                return True
+            else:
+                _log.warning(
+                    "condor_advertise unsuccessful, exit code %d", ret.returncode
+                )
+                _log_ml(logging.WARNING, "Output: %s", ret.stdout)
+                with open(adfh.name, encoding="utf-8") as adfh_read:
+                    _log_ml(logging.DEBUG, "ad:\n%s", adfh_read.read())
+                self.failure_count += 1
+                return False
 
     def _untar_condor(self, condor_dir: Path) -> None:
         _log.debug(
