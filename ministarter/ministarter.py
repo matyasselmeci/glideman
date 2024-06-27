@@ -22,7 +22,7 @@ from typing import Dict, List, NamedTuple, Optional, Union
 
 from procstat import ProcFamily
 
-VERSION = "0.25-dockerpilot"
+VERSION = "0.30-dockerpilot"
 # ^^ something to print at the beginning to see what version of
 #    this program is running; try to base it on "git describe"
 
