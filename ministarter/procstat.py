@@ -244,7 +244,13 @@ class ProcFamily:
                 continue
 
             if child_procstat.ppid == rootpid:
-                child_cmdline = get_cmdline(child_procstat.pid)
+                try:
+                    child_cmdline = get_cmdline(child_procstat.pid)
+                except (OSError, ValueError) as err:
+                    self.log.warning(
+                        "error getting cmdline for pid %d: %s", child_procstat.pid, err
+                    )
+                    continue
                 child_procinfo = ProcInfo(stat=child_procstat, cmdline=child_cmdline)
                 # We needed to get the procstat anyway to find our parent so pass it
                 # down so we don't read it again.
