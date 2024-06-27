@@ -4,6 +4,7 @@
 # import glob
 import argparse
 import atexit
+import functools
 import logging
 import os
 import re
@@ -11,6 +12,7 @@ import resource
 import secrets
 import shlex
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -22,7 +24,7 @@ from typing import Dict, List, NamedTuple, Optional, Union
 
 from procstat import ProcFamily
 
-VERSION = "0.30-dockerpilot"
+VERSION = "0.31-dockerpilot"
 # ^^ something to print at the beginning to see what version of
 #    this program is running; try to base it on "git describe"
 
@@ -69,6 +71,15 @@ def _log_ml(lvl: int, msg: str, *args, **kwargs):
         for line in msg_lines[:-1]:
             _log.log(lvl, "%s", line, **kwargs)
         return _log.log(lvl, "%s", last_line, **orig_kwargs)
+
+
+def handler_propagate_to_proc(proc: subprocess.Popen, signum, frame):
+    """
+    A signal handler that propagates the received signal to the proc.
+    """
+    # TODO Also attempt to send an ad indicating the received signal
+    _ = frame
+    proc.send_signal(signum)
 
 
 class AdvertiseSetupError(Exception):
@@ -634,7 +645,12 @@ def main(argv=None) -> int:
     proc = subprocess.Popen(popen_args)
     advertiser.ad_template["CmdStartTime"] = f"{int(time.time())}"
 
+    handler = functools.partial(handler_propagate_to_proc, proc=proc)
+    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGTERM, handler)
     completed = watch_job(advertiser, proc, watch_command)
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     rc = completed.rc
     if rc == 0:
